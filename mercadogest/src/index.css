@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background-color: #0d0d0d;
+  color: white;
+}
+
+select option {
+  background-color: #1e1e1e;
+  color: white;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
+}
+
+/*
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap');
+
+ 
+body {
+  @apply bg-[#0d0d0d] text-[#f0ede8] antialiased;
+  font-family: 'DM Sans', sans-serif;
+}
+
+1, h2, .font-syne {
+  font-family: 'Syne', sans-serif;
+}
+*/
