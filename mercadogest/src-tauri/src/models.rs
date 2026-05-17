@@ -21,7 +21,6 @@ pub struct Produto {
     pub estoque_atual: f64,
     pub estoque_minimo: f64,
     pub estoque_maximo: f64,
-    pub validade: Option<String>,
     pub ativo: bool,
 }
 

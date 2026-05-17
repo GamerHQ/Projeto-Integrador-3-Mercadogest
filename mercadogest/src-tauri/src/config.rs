@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+#[tauri::command]
 pub fn carregar_database_url() -> String {
     // 1. Tenta variável de ambiente do sistema primeiro
     if let Ok(url) = std::env::var("DATABASE_URL") {
@@ -43,6 +44,7 @@ pub fn carregar_database_url() -> String {
     String::from("DATABASE_URL")
 }
 
+#[tauri::command]
 fn executavel_dir() -> PathBuf {
     std::env::current_exe()
         .unwrap()

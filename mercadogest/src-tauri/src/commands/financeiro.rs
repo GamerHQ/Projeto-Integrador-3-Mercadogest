@@ -5,6 +5,7 @@ use crate::models::{
     Lancamento, NovoLancamento, DashboardKpis,
     GraficoDia, TopProduto, PagamentoPorTipo,
 };
+use rust_decimal::prelude::*;
 
 #[command]
 pub async fn listar_lancamentos(
@@ -38,14 +39,14 @@ pub async fn criar_lancamento(
     lancamento: NovoLancamento,
 ) -> Result<bool, String> {
     let client = state.pool.get().await.map_err(|e| e.to_string())?;
-
+    let valor_dec = Decimal::from_f64(lancamento.valor).unwrap_or_default();
     client.execute(
         "INSERT INTO financeiro (tipo, descricao, valor, categoria)
          VALUES ($1, $2, $3, $4)",
         &[
             &lancamento.tipo,
             &lancamento.descricao,
-            &lancamento.valor,
+            &valor_dec,
             &lancamento.categoria,
         ],
     ).await.map_err(|e| e.to_string())?;

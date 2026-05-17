@@ -59,10 +59,18 @@ export const useStore = create((set, get) => ({
     await get().carregarProdutos();
   },
 
+  atualizarEstoque: async (id, estoqueAtual) => {
+    await invoke("atualizar_estoque", { 
+      id: Number(id), 
+      estoqueAtual: Number(estoqueAtual) 
+    });
+    await get().carregarProdutos(); 
+  },
+
   // ── Vendas / PDV ─────────────────────────────────
   registrarVenda: async (venda) => {
     const id = await invoke("registrar_venda", { venda });
-    await get().carregarProdutos(); // atualiza estoque
+    await get().carregarProdutos();
     return id;
   },
 

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useStore } from "../store/useStore";
+import { invoke } from "@tauri-apps/api/core";
 
 const fmt = (v) =>
   Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -44,26 +45,32 @@ export function Produtos() {
     setModal(true);
   };
 
-  const salvar = async () => {
-    const payload = {
-      ...form,
-      categoria_id:   form.categoria_id ? Number(form.categoria_id) : null,
-      custo:          Number(form.custo),
-      preco_venda:    Number(form.preco_venda),
-      estoque_atual:  Number(form.estoque_atual),
+const salvar = async () => {
+  if (!form.nome || !form.preco_venda) return;
+
+  try {
+    const produtoParaEnviar = {
+      nome: form.nome,
+      codigo_barras: form.codigo_barras || null,
+      categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
+      unidade: form.unidade,
+      custo: Number(form.custo),
+      preco_venda: Number(form.preco_venda),
+      estoque_atual: Number(form.estoque_atual),
       estoque_minimo: Number(form.estoque_minimo),
       estoque_maximo: Number(form.estoque_maximo),
-      codigo_barras:  form.codigo_barras || null,
-      validade:       form.validade || null,
     };
-    try {
-      if (editId) await atualizarProduto(editId, payload);
-      else        await criarProduto(payload);
-      setModal(false);
-    } catch (e) {
-      alert("Erro ao salvar: " + e);
-    }
-  };
+    if (editId) {
+      await atualizarProduto(editId, produtoParaEnviar);
+    } else {
+     await criarProduto(produtoParaEnviar);
+    }   
+    setModal(false);
+    setForm(vazio);
+  } catch (e) {
+    alert("Erro ao salvar: " + e);
+  }
+};
 
   const produtos_filtrados = produtos.filter((p) => {
     const okBusca = p.nome.toLowerCase().includes(busca.toLowerCase());

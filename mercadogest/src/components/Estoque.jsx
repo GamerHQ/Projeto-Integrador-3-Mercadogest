@@ -3,7 +3,7 @@ import { useStore } from "../store/useStore";
 import { invoke } from "@tauri-apps/api/core";
 
 export function Estoque() {
-  const { produtos, carregarProdutos, carregando } = useStore();
+  const { produtos, carregarProdutos, carregando, atualizarEstoque} = useStore();
   const [repondoId, setRepondoId] = useState(null);
   const [qtdRepor, setQtdRepor] = useState("");
 
@@ -16,8 +16,7 @@ export function Estoque() {
   const repor = async (id) => {
     if (!qtdRepor || Number(qtdRepor) <= 0) return;
     try {
-      await invoke("atualizar_estoque", { produtoId: id, quantidade: Number(qtdRepor) });
-      await carregarProdutos();
+      await atualizarEstoque(id, qtdRepor);
       setRepondoId(null);
       setQtdRepor("");
     } catch (e) {
