@@ -175,6 +175,21 @@ const salvar = async () => {
                     >
                       Editar
                     </button>
+                    <button
+                        onClick={async () => {
+                          // Confirmação de segurança para não apagar sem querer
+                          if (window.confirm(`Tem certeza que deseja excluir ${p.nome}?`)) {
+                            try {
+                              await excluirProduto(p.id);
+                            } catch (e) {
+                              alert("Erro ao excluir: " + e);
+                            }
+                          }
+                        }}
+                        className="text-xs bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all"
+                      >
+                        Excluir
+                      </button>
                   </td>
                 </tr>
               );

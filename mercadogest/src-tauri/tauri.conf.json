@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "mercadogest - Sistema de Gestão",
+        "maximized": true,
         "width": 1200,
         "height": 800,
         "resizable": true,

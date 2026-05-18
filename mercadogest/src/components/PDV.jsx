@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../store/useStore";
+import { invoke } from "@tauri-apps/api/core";
 
 const fmt = (v) =>
   Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -24,28 +25,32 @@ export function PDV() {
     p.nome.toLowerCase().includes(busca.toLowerCase())
   );
 
-  const adicionar = (produto) => {
+const adicionar = (produto, valorBalanca = null) => {
     setCarrinho((prev) => {
       const existe = prev.find((i) => i.produto_id === produto.id);
+
+      const precoAUsar = valorBalanca !== null ? valorBalanca : produto.preco_venda;
+
       if (existe) {
         return prev.map((i) =>
           i.produto_id === produto.id
             ? {
                 ...i,
                 quantidade: i.quantidade + 1,
-                subtotal: (i.quantidade + 1) * i.preco_unit,
+                subtotal: valorBalanca !== null ? i.subtotal + valorBalanca : (i.quantidade + 1) * i.preco_unit,
               }
             : i
         );
       }
+
       return [
         ...prev,
         {
           produto_id: produto.id,
           nome: produto.nome,
           quantidade: 1,
-          preco_unit: produto.preco_venda,
-          subtotal: produto.preco_venda,
+          preco_unit: precoAUsar,
+          subtotal: precoAUsar,
         },
       ];
     });
@@ -137,6 +142,22 @@ export function PDV() {
     }
   };
 
+  const realizarFechamento = async () => {
+    const agora = new Date();
+    const dataStr = agora.toLocaleDateString("pt-BR");
+    const descricao = `Fechamento de caixa - ${dataStr}`;
+
+    if (window.confirm(`Deseja encerrar o caixa de hoje (${dataStr})?\nO sistema calculará automaticamente o LUCRO do dia e enviará para o módulo Financeiro.`)) {
+      try {
+        const lucro = await invoke("fechar_caixa", { descricao });
+        
+        alert(`✅ Caixa fechado com sucesso!\nUm lucro líquido de ${fmt(lucro)} foi registrado no Financeiro.`);
+      } catch (e) {
+        alert("Erro no fechamento: " + e);
+      }
+    }
+  };
+
   return (
     <>
       {/* A classe "print:hidden" garante que NADA dessa tela escura apareça na impressora.
@@ -145,10 +166,50 @@ export function PDV() {
         {/* Produtos */}
         <div className="flex flex-col gap-4">
           <input
+            type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="🔍  Buscar produto..."
+            placeholder="🔍  Buscar ou bipe o código de barras..."
             className="bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl px-4 py-3 text-sm text-white placeholder-[#6b6b6b] outline-none focus:border-[#E8622A]"
+onKeyDown={(e) => {
+              if (e.key === 'Enter' && busca.trim() !== '') {
+                const bip = busca.trim();
+
+                // ⚖️ LÓGICA DA BALANÇA (Tem 13 dígitos e começa com "2")
+                if (bip.length === 13 && bip.startsWith("2")) {
+                  
+                  // 1. Extrai o código do produto (posição 1 a 6) e remove zeros à esquerda
+                  // Ex: "2001550012503" vira "00155" e o Number() transforma em "155"
+                  const codigoProduto = String(Number(bip.substring(1, 6)));
+
+                  // 2. Extrai o valor cobrado (posição 6 a 12) e divide por 100
+                  // Ex: "001250" vira 1250, que dividido por 100 vira R$ 12,50
+                  const valorTotal = Number(bip.substring(6, 12)) / 100;
+
+                  // 3. Procura no banco (tenta achar tanto "155" quanto "00155")
+                  const produtoBipado = produtos.find(p => p.codigo_barras === codigoProduto || p.codigo_barras === bip.substring(1, 6));
+
+                  if (produtoBipado) {
+                    adicionar(produtoBipado, valorTotal);
+                    setBusca("");
+                  } else {
+                    alert(`Produto de balança não encontrado!\nCadastre um produto com o código de barras: ${codigoProduto}`);
+                  }
+                } 
+                
+                // 📦 LÓGICA NORMAL (Produtos de Prateleira)
+                else {
+                  const produtoBipado = produtos.find(p => p.codigo_barras === bip);
+                  
+                  if (produtoBipado) {
+                    adicionar(produtoBipado); 
+                    setBusca(""); 
+                  } else {
+                    alert("Produto não encontrado!");
+                  }
+                }
+              }
+            }}
           />
           <div className="grid grid-cols-4 gap-3 overflow-y-auto pb-2">
             {produtosFiltrados.map((p) => (
@@ -177,12 +238,21 @@ export function PDV() {
         <div className="bg-[#1e1e1e] border border-[#2a2a2a] rounded-2xl flex flex-col overflow-hidden">
           <div className="px-5 py-4 border-b border-[#2a2a2a] flex justify-between items-center">
             <span className="font-bold text-base">🛒 Carrinho</span>
-            <button
-              onClick={() => setCarrinho([])}
-              className="text-xs text-[#6b6b6b] hover:text-white bg-[#2a2a2a] px-3 py-1.5 rounded-lg"
-            >
-              Limpar
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={realizarFechamento}
+                className="text-xs bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 px-3 py-1.5 rounded-lg transition-all font-bold uppercase tracking-wider"
+              >
+                🔒 Fechar Caixa
+              </button>
+              
+              <button
+                onClick={() => setCarrinho([])}
+                className="text-xs text-[#6b6b6b] hover:text-white bg-[#2a2a2a] px-3 py-1.5 rounded-lg"
+              >
+                Limpar
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2">

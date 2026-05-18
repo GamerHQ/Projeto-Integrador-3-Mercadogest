@@ -105,6 +105,18 @@ export const useStore = create((set, get) => ({
     await get().carregarKpis();
   },
 
+  atualizarLancamento: async (id, dados) => {
+    await invoke("atualizar_lancamento", { id, ...dados });
+    await get().carregarLancamentos();
+    await get().carregarKpis();
+  },
+
+  excluirLancamento: async (id) => {
+    await invoke("excluir_lancamento", { id });
+    await get().carregarLancamentos();
+    await get().carregarKpis(); 
+  },
+
   // ── Dashboard ─────────────────────────────────────
   carregarKpis: async () => {
     try {

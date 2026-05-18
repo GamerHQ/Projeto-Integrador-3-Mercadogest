@@ -143,3 +143,14 @@ pub async fn atualizar_estoque(
 
     Ok(true)
 }
+
+#[tauri::command]
+pub fn salvar_relatorio_csv(conteudo: String, nome_arquivo: String) -> Result<String, String> {
+    let user_profile = std::env::var("USERPROFILE").map_err(|_| "Pasta do usuário não encontrada".to_string())?;
+    
+    let caminho = format!("{}\\Desktop\\{}", user_profile, nome_arquivo);
+    
+    std::fs::write(&caminho, conteudo).map_err(|e| e.to_string())?;
+    
+    Ok(caminho)
+}

@@ -1,9 +1,9 @@
 use deadpool_postgres::{Config, Pool, Runtime};
 use tokio_postgres::NoTls;
-use crate::config::carregar_database_url;
+// Apagamos a importação do config::carregar_database_url porque não precisamos mais dela!
 
 pub fn criar_pool() -> Pool {
-    let url = carregar_database_url();
+    let url = "postgresql://mercado_user:senha123@127.0.0.1:5432/mercadogest".to_string();
 
     // Parseia a URL no formato postgresql://user:senha@host:porta/banco
     let mut cfg = Config::new();

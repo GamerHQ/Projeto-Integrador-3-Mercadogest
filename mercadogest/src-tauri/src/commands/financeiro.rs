@@ -215,3 +215,65 @@ pub async fn pagamentos_por_tipo(
         percentual: r.get(2),
     }).collect())
 }
+
+#[command]
+pub async fn atualizar_lancamento(
+    state: tauri::State<'_, AppState>, 
+    id: i32, 
+    tipo: String, 
+    descricao: String, 
+    valor: f64, 
+    categoria: Option<String>
+) -> Result<bool, String> {
+    let client = state.pool.get().await.map_err(|e| format!("Erro no Pool: {:?}", e))?;
+    
+    let valor_dec = rust_decimal::Decimal::from_f64(valor).unwrap_or_default();
+
+    client.execute(
+        "UPDATE financeiro SET tipo = $1, descricao = $2, valor = $3, categoria = $4::VARCHAR WHERE id = $5",
+        &[&tipo, &descricao, &valor_dec, &categoria, &id],
+    ).await.map_err(|e| format!("Erro no Banco de Dados: {:?}", e))?;
+
+    Ok(true)
+}
+
+#[command]
+pub async fn excluir_lancamento(state: tauri::State<'_, AppState>, id: i32) -> Result<bool, String> {
+    let client = state.pool.get().await.map_err(|e| e.to_string())?;
+
+    client.execute(
+        "DELETE FROM financeiro WHERE id = $1",
+        &[&id],
+    ).await.map_err(|e| e.to_string())?;
+
+    Ok(true)
+}
+
+#[tauri::command]
+pub async fn fechar_caixa(state: tauri::State<'_, AppState>, descricao: String) -> Result<f64, String> {
+    let client = state.pool.get().await.map_err(|e| e.to_string())?;
+
+    let row = client.query_one(
+        "SELECT COALESCE(SUM(iv.subtotal - (p.custo * iv.quantidade)), 0)::FLOAT8 AS lucro
+         FROM venda_itens iv
+         JOIN produtos p ON p.id = iv.produto_id
+         JOIN vendas v ON v.id = iv.venda_id
+         WHERE DATE(v.criado_em) = CURRENT_DATE",
+        &[],
+    ).await.map_err(|e| format!("Erro ao calcular o lucro do dia: {:?}", e))?;
+
+    let lucro_f64: f64 = row.get("lucro");
+
+    if lucro_f64 <= 0.0 {
+        return Err("Não há lucro positivo registrado nas vendas de hoje.".to_string());
+    }
+
+    let lucro_dec = rust_decimal::Decimal::from_f64(lucro_f64).unwrap_or_default();
+
+    client.execute(
+        "INSERT INTO financeiro (tipo, descricao, valor, categoria) VALUES ('entrada', $1, $2, 'Vendas')",
+        &[&descricao, &lucro_dec],
+    ).await.map_err(|e| format!("Erro ao salvar no financeiro: {:?}", e))?;
+
+    Ok(lucro_f64)
+}

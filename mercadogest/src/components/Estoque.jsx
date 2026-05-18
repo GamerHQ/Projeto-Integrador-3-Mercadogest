@@ -32,6 +32,35 @@ export function Estoque() {
     return { label: "OK", cor: "text-green-400", dot: "bg-green-400" };
   };
 
+const exportarCSV = async () => {
+    let csvContent = "\uFEFFProduto,Categoria,Estoque Atual,Minimo,Maximo,Status\n";
+    
+    produtos.forEach(p => {
+      const st = statusEstoque(p).label;
+      const categoria = p.categoria_nome || "Sem categoria";
+      csvContent += `${p.nome},${categoria},${p.estoque_atual},${p.estoque_minimo},${p.estoque_maximo},${st}\n`;
+    });
+    const agora = new Date();
+    const dia = String(agora.getDate()).padStart(2, '0');
+    const mes = String(agora.getMonth() + 1).padStart(2, '0'); // Mês começa do zero!
+    const ano = agora.getFullYear();
+    const horas = String(agora.getHours()).padStart(2, '0');
+    const minutos = String(agora.getMinutes()).padStart(2, '0');
+
+    const nomeDoArquivo = `relatorio_estoque_${dia}-${mes}-${ano}_${horas}h${minutos}.csv`;
+
+    try {
+      // 3. Manda pro Rust o conteúdo e o nome que acabamos de criar!
+      const caminhoSalvo = await invoke("salvar_relatorio_csv", { 
+        conteudo: csvContent, 
+        nomeArquivo: nomeDoArquivo // O Tauri converte "nomeArquivo" do JS para "nome_arquivo" no Rust
+      });
+      alert("✅ Relatório gerado com sucesso!\nSalvo em: " + caminhoSalvo);
+    } catch (e) {
+      alert("Erro ao salvar relatório: " + e);
+    }
+  };
+
   return (
     <div className="animate-in fade-in duration-500">
       {/* KPIs com Estilo Padronizado */}
@@ -47,7 +76,7 @@ export function Estoque() {
           <h3 className="font-syne font-bold text-lg flex items-center gap-2">
             <span className="text-xl">📊</span> Situação do Estoque
           </h3>
-          <button className="text-xs bg-[#2a2a2a] hover:bg-[#333] text-white px-4 py-2 rounded-xl transition-all border border-[#333]">
+          <button onClick={exportarCSV} className="text-xs bg-[#2a2a2a] hover:bg-[#333] text-white px-4 py-2 rounded-xl transition-all border border-[#333]">
             Exportar Relatório
           </button>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../store/useStore";
+import { invoke } from "@tauri-apps/api/core";
 
 const fmt = (v) =>
   Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -21,9 +22,10 @@ function FinKpiCard({ label, value, subtext, colorClass, isTrendUp }) {
 }
 
 export function Financeiro() {
-  const { lancamentos, kpis, carregarLancamentos, carregarKpis, criarLancamento, carregando } = useStore();
+  const { lancamentos, kpis, carregarLancamentos, carregarKpis, criarLancamento, carregando, atualizarLancamento, excluirLancamento } = useStore();
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState(vazio);
+  const [form, setForm] = useState({ tipo: "ENTRADA", descricao: "", valor: "", categoria: "" });
+  const [editId, setEditId] = useState(null);
 
   useEffect(() => {
     carregarLancamentos();
@@ -31,19 +33,73 @@ export function Financeiro() {
   }, []);
 
   const salvar = async () => {
-    if (!form.descricao || !form.valor) return;
+    if (!form.descricao || form.valor === "" || form.valor === undefined) {
+      alert("⛔ O código parou aqui: A descrição ou o valor estão vazios no sistema!");
+      return;
+    }
     try {
-      await criarLancamento({
-        tipo: form.tipo,
+        const dadosDoForm = {
+        tipo: form.tipo.toLowerCase(),
         descricao: form.descricao,
         valor: Number(form.valor),
-        categoria: form.categoria || null,
-      });
+        categoria: form.tipo === "saida" ? form.categoria : null,
+      };
+      if (editId && !atualizarLancamento) {
+        alert("⛔ ERRO GRAVE: O botão não acha a função atualizarLancamento dentro do seu useStore.js!");
+        return;
+      }
+      if (editId) {
+        await atualizarLancamento(editId, dadosDoForm);
+      } else {
+        await criarLancamento(dadosDoForm);
+      }
       setModal(false);
-      setForm(vazio);
     } catch (e) {
-      alert("Erro ao salvar lançamento: " + e);
+      alert("❌ Erro que veio lá do Banco de Dados/Rust: " + e);
     }
+  };
+
+  const exportarFinanceiroCSV = async () => {
+    let csvContent = "\uFEFFTipo,Descrição,Valor (R$),Categoria\n";
+    
+    lancamentos.forEach(l => {
+      csvContent += `${l.tipo},${l.descricao},${l.valor},${l.categoria}\n`;
+    });
+
+    const agora = new Date();
+    const dia = String(agora.getDate()).padStart(2, '0');
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const ano = agora.getFullYear();
+    const horas = String(agora.getHours()).padStart(2, '0');
+    const minutos = String(agora.getMinutes()).padStart(2, '0');
+    const nomeDoArquivo = `relatorio_financeiro_${dia}-${mes}-${ano}_${horas}h${minutos}.csv`;
+
+    try {
+      const caminhoSalvo = await invoke("salvar_relatorio_csv", { 
+        conteudo: csvContent, 
+        nomeArquivo: nomeDoArquivo 
+      });
+      alert("✅ Relatório Financeiro gerado com sucesso!\nSalvo em: " + caminhoSalvo);
+    } catch (e) {
+      alert("Erro ao exportar financeiro: " + e);
+  }
+};
+
+const abrirNovo = () => {
+    setForm({ tipo: "ENTRADA", descricao: "", valor: "", categoria: "" });
+    setEditId(null);
+    setModal(true);
+  };
+
+  const abrirEditar = (lancamentoClicado) => {
+    setForm({
+      tipo: lancamentoClicado.tipo,
+      descricao: lancamentoClicado.descricao,
+      valor: lancamentoClicado.valor,
+      categoria: lancamentoClicado.categoria
+    });
+    setEditId(lancamentoClicado.id);
+    setModal(true);
   };
 
   const gastosPorCat = lancamentos
@@ -87,13 +143,19 @@ export function Financeiro() {
             <h3 className="font-syne font-bold text-base flex items-center gap-2">
               <span className="text-xl">📋</span> Lançamentos Recentes
             </h3>
-            <button
-              onClick={() => setModal(true)}
-              className="bg-[#E8622A] hover:bg-[#d4531f] text-white px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all shadow-lg shadow-orange-900/20"
-            >
-              + Novo Lançamento
-            </button>
+            <div className="flex gap-2">
+              <button onClick={exportarFinanceiroCSV} className="text-xs bg-[#2a2a2a] hover:bg-[#333] text-white px-4 py-2 rounded-xl transition-all border border-[#333]">
+                Exportar Relatório
+              </button>
+              <button
+                onClick={abrirNovo} // Chamando abrirNovo ao invés de setModal(true) direto
+                className="bg-[#E8622A] hover:bg-[#d4531f] text-white px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all shadow-lg shadow-orange-900/20"
+              >
+                + Novo Lançamento
+              </button>
+            </div>
           </div>
+
           <div className="divide-y divide-[#2a2a2a] max-h-[500px] overflow-y-auto">
             {carregando ? (
               <p className="text-center text-[#6b6b6b] py-12 text-sm animate-pulse">Carregando movimentações...</p>
@@ -104,15 +166,41 @@ export function Financeiro() {
                     ${l.tipo === "entrada" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
                     {l.tipo === "entrada" ? "💵" : "📤"}
                   </div>
+                  
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-[#f0ede8] truncate">{l.descricao}</p>
                     <p className="text-[10px] text-[#6b6b6b] font-bold uppercase tracking-tighter">
                       {l.categoria ?? "Geral"} • {l.criado_em}
                     </p>
                   </div>
-                  <span className={`font-syne font-bold text-sm ${l.tipo === "entrada" ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
+                  
+                  <span className={`font-syne font-bold text-sm mr-4 ${l.tipo === "entrada" ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
                     {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
                   </span>
+
+                  {/* BOTÕES DE EDITAR E EXCLUIR NO LUGAR CERTO */}
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => abrirEditar(l)}
+                      className="text-[10px] bg-[#2a2a2a] hover:bg-[#333] text-white px-3 py-1.5 rounded-lg transition-all font-bold uppercase tracking-wider"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (window.confirm(`Deseja realmente estornar o lançamento: "${l.descricao}"?`)) {
+                          try {
+                            await excluirLancamento(l.id);
+                          } catch (e) {
+                            alert("Erro ao excluir: " + e);
+                          }
+                        }
+                      }}
+                      className="text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg transition-all font-bold uppercase tracking-wider"
+                    >
+                      Excluir
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -159,12 +247,14 @@ export function Financeiro() {
         </div>
       </div>
 
-      {/* Modal novo lançamento - Padronizado */}
+      {/* Modal novo/editar lançamento */}
       {modal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[100] animate-in fade-in duration-300 px-4">
           <div className="bg-[#161616] border border-[#2a2a2a] rounded-3xl w-full max-w-[420px] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="font-syne font-bold text-xl tracking-tight">Novo Lançamento</h2>
+              <h2 className="font-syne font-bold text-xl tracking-tight">
+                {editId ? "Editar Lançamento" : "Novo Lançamento"}
+              </h2>
               <button onClick={() => setModal(false)} className="w-8 h-8 flex items-center justify-center bg-[#2a2a2a] hover:bg-[#333] rounded-full text-xs text-[#6b6b6b] transition-colors">✕</button>
             </div>
 
@@ -213,7 +303,7 @@ export function Financeiro() {
               </button>
               <button onClick={salvar}
                 className="flex-[1.5] bg-[#E8622A] hover:bg-[#d4531f] text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg shadow-orange-900/30">
-                ✅ Confirmar
+                ✅ {editId ? "Salvar Alterações" : "Confirmar"}
               </button>
             </div>
           </div>

@@ -45,10 +45,11 @@ fn main() {
             // Produtos
             listar_produtos,
             criar_produto,
-            atualizar_produto,
             excluir_produto,
             listar_categorias,
             atualizar_estoque,
+            commands::produtos::atualizar_produto,
+            commands::produtos::salvar_relatorio_csv,
             // Vendas
             registrar_venda,
             listar_vendas,
@@ -59,6 +60,10 @@ fn main() {
             grafico_7_dias,
             top_produtos,
             pagamentos_por_tipo,
+            commands::financeiro::atualizar_lancamento,
+            commands::financeiro::excluir_lancamento,
+            commands::financeiro::fechar_caixa,
+
         ])
         .run(tauri::generate_context!())
         .expect("Erro ao iniciar o MercadoGest");
